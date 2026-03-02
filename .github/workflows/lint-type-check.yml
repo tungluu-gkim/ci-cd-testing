@@ -44,8 +44,7 @@ jobs:
           cache-dependency-glob: "**/pyproject.toml"
 
       - run: uv python install ${{ env.PYTHON_VERSION }}
-      - run: |
-          - run: uv sync --group dev
+      - run: uv sync --group dev
       - run: uv run mypy packages/ --ignore-missing-imports
 
   # test:
