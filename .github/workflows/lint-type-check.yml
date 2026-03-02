@@ -45,16 +45,7 @@ jobs:
 
       - run: uv python install ${{ env.PYTHON_VERSION }}
       - run: |
-          uv sync \
-            --package config \
-            --package exceptions \
-            --package models \
-            --package utils \
-            --package database \
-            --package middleware \
-            --package faststream_broker \
-            --package aws_client \
-            --group dev
+          - run: uv sync --group dev
       - run: uv run mypy packages/ --ignore-missing-imports
 
   # test:
