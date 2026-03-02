@@ -1,0 +1,136 @@
+name: Lint and Type Check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - uat
+      - dev
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  lint:
+    name: Lint and Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
+
+      - run: uv python install ${{ env.PYTHON_VERSION }}
+      - run: uv sync --group dev
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+
+  typecheck:
+    name: Type Check (packages)
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
+
+      - run: uv python install ${{ env.PYTHON_VERSION }}
+      - run: |
+          uv sync \
+            --package config \
+            --package exceptions \
+            --package models \
+            --package utils \
+            --package database \
+            --package middleware \
+            --package faststream_broker \
+            --package aws_client \
+            --group dev
+      - run: uv run mypy packages/ --ignore-missing-imports
+
+  # test:
+  #   name: Test (${{ matrix.service }})
+  #   runs-on: ubuntu-latest
+  #   needs: lint
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       service:
+  #         - ocr_service
+  #         - counseling_service
+  #         - validation_service
+  #   steps:
+  #     - uses: actions/checkout@v4
+
+  #     - uses: astral-sh/setup-uv@v4
+  #       with:
+  #         enable-cache: true
+  #         cache-dependency-glob: "uv.lock"
+
+  #     - run: uv python install ${{ env.PYTHON_VERSION }}
+  #     - run: uv sync --package ${{ matrix.service }} --group dev --frozen
+
+  #     - name: Run tests
+  #       run: |
+  #         uv run pytest apps/${{ matrix.service }}/tests/ \
+  #           -m "not integration" \
+  #           --override-ini="addopts=" \
+  #           --strict-markers \
+  #           --tb=short \
+  #           -v \
+  #           --cov=apps/${{ matrix.service }} \
+  #           --cov=packages \
+  #           --cov-report=xml:coverage-${{ matrix.service }}.xml \
+  #           --cov-report=term-missing
+
+  #     - uses: actions/upload-artifact@v4
+  #       if: always()
+  #       with:
+  #         name: coverage-${{ matrix.service }}
+  #         path: coverage-${{ matrix.service }}.xml
+
+  # build-verify:
+  #   name: Build Verify (${{ matrix.service }})
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       service:
+  #         - ocr_service
+  #         - counseling_service
+  #         - audio_scoring_service
+  #         - med_doc_service
+  #         - hra_service
+  #         - validation_service
+  #   steps:
+  #     - uses: actions/checkout@v4
+
+  #     - uses: astral-sh/setup-uv@v4
+  #       with:
+  #         enable-cache: true
+  #         cache-dependency-glob: "uv.lock"
+
+  #     - run: uv python install ${{ env.PYTHON_VERSION }}
+  #     - run: uv sync --package ${{ matrix.service }} --frozen
+
+  #     - name: Verify service imports
+  #       run: |
+  #         uv run python -c "
+  #         import importlib.util, pathlib
+  #         service = '${{ matrix.service }}'
+  #         main = pathlib.Path('apps') / service / 'main.py'
+  #         if main.exists():
+  #             spec = importlib.util.spec_from_file_location('main', main)
+  #             print(f'{service}: main.py found \u2713')
+  #         else:
+  #             print(f'{service}: no main.py, skipping')
+  #         "
